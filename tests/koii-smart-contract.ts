@@ -136,6 +136,7 @@ describe("koii-smart-contract", () => {
     const tokenAccountInitTx = new web3.Transaction();
     tokenAccountInitTx.add(createBountyAccountIx);
     tokenAccountInitTx.add(initTempAccountIx);
+
     tokenAccountInitTx.feePayer = myKeypair.publicKey;
 
     // initializing new bounty token account with tx
@@ -166,7 +167,22 @@ describe("koii-smart-contract", () => {
     console.log(
       new Date(),
       "bootstraper token account is",
-      bootstraperTokenAccount
+      bootstraperTokenAccount.toBase58()
+    );
+
+    let [beforeBountyAccountOnSol, beforeBaAmount] =
+      await fetchDecodeTokenAccount(
+        bountyAccount.publicKey,
+        localAnchorProvider
+      );
+
+    console.log(
+      new Date(),
+      "## Assert: bounty account is owned by Bootstraper"
+    );
+    assert.equal(
+      beforeBountyAccountOnSol.owner.toBase58(),
+      myKeypair.publicKey.toBase58()
     );
 
     console.log(new Date(), "Invoking initialize");
@@ -192,6 +208,14 @@ describe("koii-smart-contract", () => {
       bountyAccount.publicKey,
       localAnchorProvider
     );
+
+    console.log(new Date(), "## Assert: bounty account is owned by Program");
+    assert.equal(bountyAccountOnSol.owner.toBase58(), pda.toBase58());
+
+    console.log(
+      new Date(),
+      "## Assert: bounty amount has been successfully transferred to Program Owned Account"
+    );
     assert.equal("6000", baAmount);
 
     let [bootstraperTokenAccountOnSol, btAmount] =
@@ -200,13 +224,20 @@ describe("koii-smart-contract", () => {
         localAnchorProvider
       );
 
+    console.log(new Date(), "## Assert: Bootraper's token account is deducted");
     assert.equal("9994000", btAmount);
 
+    console.log(new Date(), "## Assert: Bootraper's token account is deducted");
     let taskAccountOnSol = await program.account.task.fetch(pda);
+
+    console.log(new Date(), "## Assert: PDA is initialized correctly");
+    console.log(new Date(), "## Assert: PDA has auditProgramLocation");
     assert.equal(
       taskAccountOnSol.auditProgramLocation,
       "the_path_totask_program"
     );
+
+    console.log(new Date(), "## Assert: PDA has taskProgramLocation");
     assert.equal(
       taskAccountOnSol.taskProgramLocation,
       "the_path_to_audit_program"

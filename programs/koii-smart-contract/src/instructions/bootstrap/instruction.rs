@@ -4,7 +4,7 @@ use std::string::String;
 
 use super::account::BootStrapInput;
 
-pub fn perform_prerequisites(
+pub fn initialize_task(
     ctx: Context<BootStrapInput>,
     bounty_amount: u64,
     task_program_location: String,
@@ -27,6 +27,25 @@ pub fn perform_prerequisites(
     match token::transfer(token_transfer_ctx, bounty_amount) {
         Ok(_) => (),
         Err(_) => msg!("Token transfer failed"),
+    }
+
+    let token_account_set_auth_ctx = token::SetAuthority {
+        current_authority: ctx.accounts.bootstraper.to_account_info(),
+        account_or_mint: ctx.accounts.bounty_account.to_account_info(),
+    };
+
+    let set_auth_result = token::set_authority(
+        CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            token_account_set_auth_ctx,
+        ),
+        token::spl_token::instruction::AuthorityType::AccountOwner,
+        Some(ctx.accounts.task_account.key()),
+    );
+
+    match set_auth_result {
+        Ok(_) => (),
+        Err(_) => msg!("Token set authority failed"),
     }
     msg!("Task account initialized successfully");
 }
