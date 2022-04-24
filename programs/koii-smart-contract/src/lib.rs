@@ -7,6 +7,7 @@ use anchor_lang::prelude::*;
 declare_id!("WwmeGvrs7VKQKppDQo23yfEo3175jgSNcSABQeFV2Zi");
 
 use instructions::bootstrap::account::*;
+use instructions::staking::account::*;
 
 #[program]
 pub mod koii_smart_contract {
@@ -24,6 +25,15 @@ pub mod koii_smart_contract {
             task_program_location,
             audit_program_location,
         );
+        Ok(())
+    }
+
+    /// initialize staking
+    pub fn initialize_staking_account(
+        ctx: Context<StakingInput>,
+        staked_amount: u64,
+    ) -> Result<()> {
+        instructions::staking::instruction::initialize_staking(ctx, staked_amount);
         Ok(())
     }
 }

@@ -29,7 +29,7 @@ const fetchDecodeTokenAccount = async (
   return [rawAccount, amount.toString()];
 };
 
-describe("koii-smart-contract", () => {
+describe("Task Tests: koii-smart-contract", () => {
   const localAnchorProvider = anchor.AnchorProvider.env();
   // Configure the client to use the local cluster.
   anchor.setProvider(localAnchorProvider);
@@ -109,7 +109,7 @@ describe("koii-smart-contract", () => {
     );
   });
 
-  it("Is initialized!", async () => {
+  it("Is Task account initialized and bountied", async () => {
     console.log(new Date(), "Is initialize started");
     const bountyAccount = web3.Keypair.generate();
 
