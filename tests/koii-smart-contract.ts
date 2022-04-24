@@ -5,17 +5,34 @@ import {
   AccountLayout,
   createMint,
   getOrCreateAssociatedTokenAccount,
-  getAccount,
   createInitializeAccountInstruction,
   mintTo,
   TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
+  RawAccount,
+  Account,
 } from "@solana/spl-token";
 import { findProgramAddressSync } from "@project-serum/anchor/dist/cjs/utils/pubkey";
+import { assert } from "chai";
+
+const fetchDecodeTokenAccount = async (
+  accountPublicKey: anchor.web3.PublicKey,
+  provider: anchor.Provider
+): Promise<[RawAccount, string]> => {
+  const tokenInfoLol = await provider.connection.getAccountInfo(
+    accountPublicKey
+  );
+  const data = Buffer.from(tokenInfoLol.data);
+  const rawAccount: RawAccount = AccountLayout.decode(data);
+
+  const amount = rawAccount.amount;
+  return [rawAccount, amount.toString()];
+};
 
 describe("koii-smart-contract", () => {
+  const localAnchorProvider = anchor.AnchorProvider.env();
   // Configure the client to use the local cluster.
-  anchor.setProvider(anchor.AnchorProvider.env());
+  anchor.setProvider(localAnchorProvider);
 
   const program = anchor.workspace
     .KoiiSmartContract as Program<KoiiSmartContract>;
@@ -25,7 +42,7 @@ describe("koii-smart-contract", () => {
   console.log("My address ", myKeypair.publicKey.toBase58());
   console.log("Mint address ", mintKeypair.publicKey.toBase58());
 
-  const connection = new web3.Connection("http://localhost:8899");
+  const connection = anchor.getProvider().connection;
   // const connection = new web3.Connection(web3.clusterApiUrl("devnet"));
 
   // perform prerequisites for the tests
@@ -169,6 +186,32 @@ describe("koii-smart-contract", () => {
       })
       .signers([myKeypair])
       .rpc();
-    console.log("Your transaction", tx);
+    console.log(new Date(), "Your transaction", tx);
+
+    let [bountyAccountOnSol, baAmount] = await fetchDecodeTokenAccount(
+      bountyAccount.publicKey,
+      localAnchorProvider
+    );
+    assert.equal("6000", baAmount);
+
+    let [bootstraperTokenAccountOnSol, btAmount] =
+      await fetchDecodeTokenAccount(
+        bootstraperTokenAccount,
+        localAnchorProvider
+      );
+
+    assert.equal("9994000", btAmount);
+
+    let taskAccountOnSol = await program.account.task.fetch(pda);
+    assert.equal(
+      taskAccountOnSol.auditProgramLocation,
+      "the_path_totask_program"
+    );
+    assert.equal(
+      taskAccountOnSol.taskProgramLocation,
+      "the_path_to_audit_program"
+    );
+
+    console.log(new Date(), "All assertions successful");
   });
 });
