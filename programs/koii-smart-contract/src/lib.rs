@@ -11,7 +11,19 @@ use instructions::bootstrap::account::*;
 #[program]
 pub mod koii_smart_contract {
     use super::*;
-    pub fn initialize(ctx: Context<BootStrapInput>) -> Result<()> {
+    use std::string::String;
+    pub fn initialize(
+        ctx: Context<BootStrapInput>,
+        bounty_amount: u64,
+        task_program_location: String,
+        audit_program_location: String,
+    ) -> Result<()> {
+        instructions::bootstrap::bootstrap::perform_prerequisites(
+            ctx,
+            bounty_amount,
+            task_program_location,
+            audit_program_location,
+        );
         Ok(())
     }
 }

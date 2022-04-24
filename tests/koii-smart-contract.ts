@@ -136,7 +136,11 @@ describe("koii-smart-contract", () => {
 
     console.log(new Date(), "Invoking initialize");
     const tx = await program.methods
-      .initialize()
+      .initialize(
+        new anchor.BN(6000),
+        "the_path_totask_program",
+        "the_path_to_audit_program"
+      )
       .accounts({
         bountyAccount: bountyAccount.publicKey,
         taskAccount: pda,
