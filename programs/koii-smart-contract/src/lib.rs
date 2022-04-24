@@ -6,6 +6,7 @@ use anchor_lang::prelude::*;
 
 declare_id!("WwmeGvrs7VKQKppDQo23yfEo3175jgSNcSABQeFV2Zi");
 
+use instructions::assign_task::account::*;
 use instructions::bootstrap::account::*;
 use instructions::staking::account::*;
 
@@ -34,6 +35,12 @@ pub mod koii_smart_contract {
         staked_amount: u64,
     ) -> Result<()> {
         instructions::staking::instruction::initialize_staking(ctx, staked_amount);
+        Ok(())
+    }
+
+    /// initialize staking
+    pub fn assign_task(ctx: Context<AssignTaskInputs>) -> Result<()> {
+        instructions::assign_task::instruction::assign_task(ctx);
         Ok(())
     }
 }

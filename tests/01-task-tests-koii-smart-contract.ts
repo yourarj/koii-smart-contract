@@ -10,7 +10,6 @@ import {
   TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
   RawAccount,
-  Account,
 } from "@solana/spl-token";
 import { findProgramAddressSync } from "@project-serum/anchor/dist/cjs/utils/pubkey";
 import { assert } from "chai";
@@ -36,10 +35,10 @@ describe("Task Tests: koii-smart-contract", () => {
 
   const program = anchor.workspace
     .KoiiSmartContract as Program<KoiiSmartContract>;
-  const tokenProgram = anchor.Spl.token();
-  const myKeypair = web3.Keypair.generate();
+  const taskSubmitterKeypair = web3.Keypair.generate();
+  const taskWorkerKeypair = web3.Keypair.generate();
   const mintKeypair = web3.Keypair.generate();
-  console.log("My address ", myKeypair.publicKey.toBase58());
+  console.log("My address ", taskSubmitterKeypair.publicKey.toBase58());
   console.log("Mint address ", mintKeypair.publicKey.toBase58());
 
   const connection = anchor.getProvider().connection;
@@ -49,17 +48,17 @@ describe("Task Tests: koii-smart-contract", () => {
   before(async () => {
     console.log(new Date(), "requesting airdrop");
     const airdropTx = await connection.requestAirdrop(
-      myKeypair.publicKey,
+      taskSubmitterKeypair.publicKey,
       5 * web3.LAMPORTS_PER_SOL
     );
     await connection.confirmTransaction(airdropTx);
 
     console.log(new Date(), "fetching balance after airdrop");
-    const balance = await connection.getBalance(myKeypair.publicKey);
+    const balance = await connection.getBalance(taskSubmitterKeypair.publicKey);
     console.log(
       new Date(),
       "Balance of",
-      myKeypair.publicKey.toBase58(),
+      taskSubmitterKeypair.publicKey.toBase58(),
       "and balance is",
       balance
     );
@@ -71,9 +70,9 @@ describe("Task Tests: koii-smart-contract", () => {
     console.log(new Date(), "creating new token mint account");
     const mint = await createMint(
       connection,
-      myKeypair,
-      myKeypair.publicKey,
-      myKeypair.publicKey,
+      taskSubmitterKeypair,
+      taskSubmitterKeypair.publicKey,
+      taskSubmitterKeypair.publicKey,
       18,
       mintKeypair
     );
@@ -86,9 +85,9 @@ describe("Task Tests: koii-smart-contract", () => {
     );
     const tokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
-      myKeypair,
+      taskSubmitterKeypair,
       mint,
-      myKeypair.publicKey
+      taskSubmitterKeypair.publicKey
     );
 
     console.log(
@@ -101,10 +100,10 @@ describe("Task Tests: koii-smart-contract", () => {
     console.log(new Date(), "minting some tokens");
     await mintTo(
       connection,
-      myKeypair,
+      taskSubmitterKeypair,
       mint,
       tokenAccount.address,
-      myKeypair.publicKey,
+      taskSubmitterKeypair.publicKey,
       10_000_000
     );
   });
@@ -121,7 +120,7 @@ describe("Task Tests: koii-smart-contract", () => {
         AccountLayout.span,
         "confirmed"
       ),
-      fromPubkey: myKeypair.publicKey,
+      fromPubkey: taskSubmitterKeypair.publicKey,
       newAccountPubkey: bountyAccount.publicKey,
     });
 
@@ -129,7 +128,7 @@ describe("Task Tests: koii-smart-contract", () => {
     const initTempAccountIx = createInitializeAccountInstruction(
       bountyAccount.publicKey,
       mintKeypair.publicKey,
-      myKeypair.publicKey,
+      taskSubmitterKeypair.publicKey,
       TOKEN_PROGRAM_ID
     );
 
@@ -137,13 +136,13 @@ describe("Task Tests: koii-smart-contract", () => {
     tokenAccountInitTx.add(createBountyAccountIx);
     tokenAccountInitTx.add(initTempAccountIx);
 
-    tokenAccountInitTx.feePayer = myKeypair.publicKey;
+    tokenAccountInitTx.feePayer = taskSubmitterKeypair.publicKey;
 
     // initializing new bounty token account with tx
     console.log(new Date(), "Initializing new bounty account");
     const txSig = await connection.sendTransaction(tokenAccountInitTx, [
       bountyAccount,
-      myKeypair,
+      taskSubmitterKeypair,
     ]);
     await connection.confirmTransaction(txSig);
 
@@ -155,14 +154,14 @@ describe("Task Tests: koii-smart-contract", () => {
     let [pda, bump] = await findProgramAddressSync(
       [
         Buffer.from(anchor.utils.bytes.utf8.encode("task_v0")),
-        myKeypair.publicKey.toBuffer(),
+        taskSubmitterKeypair.publicKey.toBuffer(),
       ],
       program.programId
     );
 
     let bootstraperTokenAccount = await getAssociatedTokenAddress(
       mintKeypair.publicKey,
-      myKeypair.publicKey
+      taskSubmitterKeypair.publicKey
     );
     console.log(
       new Date(),
@@ -182,7 +181,7 @@ describe("Task Tests: koii-smart-contract", () => {
     );
     assert.equal(
       beforeBountyAccountOnSol.owner.toBase58(),
-      myKeypair.publicKey.toBase58()
+      taskSubmitterKeypair.publicKey.toBase58()
     );
 
     console.log(new Date(), "Invoking initialize");
@@ -195,12 +194,12 @@ describe("Task Tests: koii-smart-contract", () => {
       .accounts({
         bountyAccount: bountyAccount.publicKey,
         taskAccount: pda,
-        bootstraper: myKeypair.publicKey,
+        bootstraper: taskSubmitterKeypair.publicKey,
         bootstraperTokenAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: web3.SystemProgram.programId,
       })
-      .signers([myKeypair])
+      .signers([taskSubmitterKeypair])
       .rpc();
     console.log(new Date(), "Your transaction", tx);
 
@@ -244,5 +243,30 @@ describe("Task Tests: koii-smart-contract", () => {
     );
 
     console.log(new Date(), "All assertions successful");
+  });
+
+  it("Has task been assigned successfully", async () => {
+    let [pda, bump] = await findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("task_v0")),
+        taskSubmitterKeypair.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+    program.methods
+      .assignTask()
+      .accounts({ taskAccount: pda, worker: taskWorkerKeypair.publicKey })
+      .signers([taskWorkerKeypair])
+      .rpc();
+
+    let taskAccountOnSol = await program.account.task.fetch(pda, "confirmed");
+
+    console.log(taskAccountOnSol);
+
+    console.log(new Date(), "## Assert: PDA  task has expected worker");
+    assert.equal(
+      taskAccountOnSol.assignee.toBase58(),
+      taskWorkerKeypair.publicKey.toBase58()
+    );
   });
 });
