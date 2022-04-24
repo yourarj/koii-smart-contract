@@ -18,7 +18,7 @@ pub mod koii_smart_contract {
         task_program_location: String,
         audit_program_location: String,
     ) -> Result<()> {
-        instructions::bootstrap::bootstrap::perform_prerequisites(
+        instructions::bootstrap::instruction::perform_prerequisites(
             ctx,
             bounty_amount,
             task_program_location,

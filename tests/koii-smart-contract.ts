@@ -5,9 +5,11 @@ import {
   AccountLayout,
   createMint,
   getOrCreateAssociatedTokenAccount,
+  getAccount,
   createInitializeAccountInstruction,
   mintTo,
   TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import { findProgramAddressSync } from "@project-serum/anchor/dist/cjs/utils/pubkey";
 
@@ -72,6 +74,12 @@ describe("koii-smart-contract", () => {
       myKeypair.publicKey
     );
 
+    console.log(
+      new Date(),
+      "bootstraper token account is",
+      tokenAccount.address.toBase58()
+    );
+
     // mint tokens to send to the bouty account
     console.log(new Date(), "minting some tokens");
     await mintTo(
@@ -80,7 +88,7 @@ describe("koii-smart-contract", () => {
       mint,
       tokenAccount.address,
       myKeypair.publicKey,
-      100
+      10_000_000
     );
   });
 
@@ -134,6 +142,16 @@ describe("koii-smart-contract", () => {
       program.programId
     );
 
+    let bootstraperTokenAccount = await getAssociatedTokenAddress(
+      mintKeypair.publicKey,
+      myKeypair.publicKey
+    );
+    console.log(
+      new Date(),
+      "bootstraper token account is",
+      bootstraperTokenAccount
+    );
+
     console.log(new Date(), "Invoking initialize");
     const tx = await program.methods
       .initialize(
@@ -145,6 +163,7 @@ describe("koii-smart-contract", () => {
         bountyAccount: bountyAccount.publicKey,
         taskAccount: pda,
         bootstraper: myKeypair.publicKey,
+        bootstraperTokenAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: web3.SystemProgram.programId,
       })

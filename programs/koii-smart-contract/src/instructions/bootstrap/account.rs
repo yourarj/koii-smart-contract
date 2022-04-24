@@ -8,6 +8,7 @@ use std::string::String;
 #[derive(Accounts)]
 pub struct BootStrapInput<'info> {
     /// bounty account
+    #[account(mut)]
     pub bounty_account: Account<'info, TokenAccount>,
 
     /// task account
@@ -23,6 +24,10 @@ pub struct BootStrapInput<'info> {
     /// bootstraper
     #[account(mut)]
     pub bootstraper: Signer<'info>,
+
+    // bootstraper token account
+    #[account(mut)]
+    pub bootstraper_token_account: Account<'info, TokenAccount>,
 
     /// token program
     pub token_program: Program<'info, Token>,
