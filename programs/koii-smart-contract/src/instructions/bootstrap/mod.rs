@@ -1,2 +1,2 @@
 pub mod account;
-pub mod bootstrap;
+pub mod instruction;
