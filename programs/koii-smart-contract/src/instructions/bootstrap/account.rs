@@ -13,9 +13,9 @@ pub struct BootStrapInput<'info> {
     #[account(
         init,
         space=400,
-        seeds=[b"task_v0", bootstraper.key().as_ref()],
+        seeds=[b"task_v0".as_ref(), bootstraper.key().as_ref()],
         bump,
-        payer= bootstraper
+        payer=bootstraper
     )]
     task_account: Account<'info, Task>,
 
