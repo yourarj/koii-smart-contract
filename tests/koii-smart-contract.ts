@@ -24,6 +24,7 @@ describe("koii-smart-contract", () => {
   console.log("Mint address ", mintKeypair.publicKey.toBase58());
 
   const connection = new web3.Connection("http://localhost:8899");
+  // const connection = new web3.Connection(web3.clusterApiUrl("devnet"));
 
   // perform prerequisites for the tests
   before(async () => {
@@ -120,9 +121,16 @@ describe("koii-smart-contract", () => {
     ]);
     await connection.confirmTransaction(txSig);
 
-    console.log(new Date(), "finding PDA");
-    let pdaAndBump = await findProgramAddressSync(
-      [Buffer.from("task")],
+    console.log(
+      new Date(),
+      "finding . Current program is:",
+      program.programId.toBase58()
+    );
+    let [pda, bump] = await findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("task_v0")),
+        myKeypair.publicKey.toBuffer(),
+      ],
       program.programId
     );
 
@@ -131,7 +139,7 @@ describe("koii-smart-contract", () => {
       .initialize()
       .accounts({
         bountyAccount: bountyAccount.publicKey,
-        taskAccount: pdaAndBump[0],
+        taskAccount: pda,
         bootstraper: myKeypair.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: web3.SystemProgram.programId,
