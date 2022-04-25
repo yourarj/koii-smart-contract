@@ -38,7 +38,7 @@ pub mod koii_smart_contract {
         Ok(())
     }
 
-    /// initialize staking
+    /// assign task to signer
     pub fn assign_task(ctx: Context<AssignTaskInputs>) -> Result<()> {
         instructions::assign_task::instruction::assign_task(ctx);
         Ok(())

@@ -253,15 +253,16 @@ describe("Task Tests: koii-smart-contract", () => {
       ],
       program.programId
     );
-    program.methods
+    console.log(new Date(), "## PDA is", pda.toBase58());
+
+    const change_assignee_tx = await program.methods
       .assignTask()
       .accounts({ taskAccount: pda, worker: taskWorkerKeypair.publicKey })
       .signers([taskWorkerKeypair])
       .rpc();
 
-    let taskAccountOnSol = await program.account.task.fetch(pda, "confirmed");
-
-    console.log(taskAccountOnSol);
+    console.log(new Date(), "Change assignee tx:", change_assignee_tx);
+    let taskAccountOnSol = await program.account.task.fetch(pda);
 
     console.log(new Date(), "## Assert: PDA  task has expected worker");
     assert.equal(
