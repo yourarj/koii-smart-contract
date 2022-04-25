@@ -9,6 +9,7 @@ declare_id!("WwmeGvrs7VKQKppDQo23yfEo3175jgSNcSABQeFV2Zi");
 
 use instructions::assign_task::account::*;
 use instructions::bootstrap::account::*;
+use instructions::claim_bounty::account::*;
 use instructions::staking::account::*;
 use instructions::vote::account::*;
 
@@ -49,5 +50,10 @@ pub mod koii_smart_contract {
     /// vote for task
     pub fn vote(ctx: Context<VoteInput>) -> Result<()> {
         instructions::vote::instruction::vote(ctx)
+    }
+
+    /// claim bounty
+    pub fn claim_bounty(ctx: Context<BountyClaimInput>) -> Result<()> {
+        instructions::claim_bounty::instruction::claim_bounty(ctx)
     }
 }

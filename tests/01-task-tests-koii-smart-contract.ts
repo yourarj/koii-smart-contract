@@ -457,20 +457,97 @@ describe("Task Tests: koii-smart-contract", () => {
     console.log(new Date(), "## Assert: PDA  task vote has not been casted");
     assert.equal(0, beforeTaskAccountOnSol.votes);
 
+    for (const _x of Array(5).keys()) {
+      const vote_tx = await program.methods
+        .vote()
+        .accounts({
+          stakingInfoAccount: stakingInfoPda,
+          taskAccount: taskPda,
+          voter: taskWorkerKeypair.publicKey,
+        })
+        .signers([taskWorkerKeypair])
+        .rpc();
+
+      console.log(new Date(), "vote tx:", vote_tx);
+    }
+    let taskAccountOnSol = await program.account.task.fetch(taskPda);
+
+    console.log(
+      new Date(),
+      "can_vote: task account votes are",
+      taskAccountOnSol.votes
+    );
+    console.log(new Date(), "## Assert: PDA  task vote has been casted");
+    assert.equal(5, taskAccountOnSol.votes);
+  });
+
+  it("Can claim bounty", async () => {
+    // get task pda pubkey
+    let [taskPda, taskBump] = await findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("task_v0")),
+        taskSubmitterKeypair.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+
+    // get task account details
+    let beforeTaskAccountOnSol = await program.account.task.fetch(taskPda);
+
+    // get claimer pubkey
+    const claimerTokenAccount = await getAssociatedTokenAddress(
+      mintKeypair.publicKey,
+      taskWorkerKeypair.publicKey
+    );
+
+    // get bounty account initial balance
+    let [_bb, beforeBountyAccBalance] = await fetchDecodeTokenAccount(
+      beforeTaskAccountOnSol.bounty,
+      localAnchorProvider
+    );
+
+    console.log(
+      new Date(),
+      "claim_bounty: bounty account's initial balance {}",
+      beforeBountyAccBalance
+    );
+
+    // get claimer initial balance
+    let [_b, beforeClaimerBalance] = await fetchDecodeTokenAccount(
+      claimerTokenAccount,
+      localAnchorProvider
+    );
+
+    console.log(
+      new Date(),
+      "claim_bounty: claimer's initial balance {}",
+      beforeClaimerBalance
+    );
+
     const vote_tx = await program.methods
-      .vote()
+      .claimBounty()
       .accounts({
-        stakingInfoAccount: stakingInfoPda,
         taskAccount: taskPda,
-        voter: taskWorkerKeypair.publicKey,
+        bountyAccount: beforeTaskAccountOnSol.bounty,
+        claimer: taskWorkerKeypair.publicKey,
+        claimerTokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
       })
       .signers([taskWorkerKeypair])
       .rpc();
 
-    console.log(new Date(), "vote tx:", vote_tx);
-    let taskAccountOnSol = await program.account.task.fetch(taskPda);
+    let [_a, afterClaimerBalance] = await fetchDecodeTokenAccount(
+      claimerTokenAccount,
+      localAnchorProvider
+    );
 
-    console.log(new Date(), "## Assert: PDA  task vote has been casted");
-    assert.equal(1, taskAccountOnSol.votes);
+    console.log(
+      new Date(),
+      "## Assert: claim_bouty: bounty has been credited to claimer"
+    );
+    assert.equal(
+      afterClaimerBalance.toString(),
+      (beforeClaimerBalance + beforeBountyAccBalance).toString()
+    );
   });
 });

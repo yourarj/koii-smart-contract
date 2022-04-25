@@ -13,4 +13,10 @@ pub enum ErrorCode {
     InvalidStakeAccountForVote,
     #[msg("To participate in voting you have to stake the tokens first")]
     InvalidStakedAmountForVote,
+    #[msg("Invalid claimer, You can't claim the bounty as you are not task executor/worker")]
+    InvalidBountyClaimer,
+    #[msg("Bounty can't be claimed unless sufficient votes are casted")]
+    InsufficientVotesForClaim,
+    #[msg("Bounty account mistmatch, bounty account for task and provided account don't match")]
+    InvalidBountyAccountForClaim,
 }
