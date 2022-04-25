@@ -1,4 +1,5 @@
 mod constant;
+mod error;
 mod instructions;
 mod state;
 
@@ -9,6 +10,7 @@ declare_id!("WwmeGvrs7VKQKppDQo23yfEo3175jgSNcSABQeFV2Zi");
 use instructions::assign_task::account::*;
 use instructions::bootstrap::account::*;
 use instructions::staking::account::*;
+use instructions::vote::account::*;
 
 #[program]
 pub mod koii_smart_contract {
@@ -42,5 +44,10 @@ pub mod koii_smart_contract {
     pub fn assign_task(ctx: Context<AssignTaskInputs>) -> Result<()> {
         instructions::assign_task::instruction::assign_task(ctx);
         Ok(())
+    }
+
+    /// vote for task
+    pub fn vote(ctx: Context<VoteInput>) -> Result<()> {
+        instructions::vote::instruction::vote(ctx)
     }
 }

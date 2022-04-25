@@ -38,6 +38,11 @@ describe("Task Tests: koii-smart-contract", () => {
   const taskSubmitterKeypair = web3.Keypair.generate();
   const taskWorkerKeypair = web3.Keypair.generate();
   const mintKeypair = web3.Keypair.generate();
+
+  const amountToStake = 85340;
+  const amountToMint = 10_000_000;
+  const amountAfterDeduction = amountToMint - amountToStake;
+
   console.log("My address ", taskSubmitterKeypair.publicKey.toBase58());
   console.log("Mint address ", mintKeypair.publicKey.toBase58());
 
@@ -52,6 +57,12 @@ describe("Task Tests: koii-smart-contract", () => {
       5 * web3.LAMPORTS_PER_SOL
     );
     await connection.confirmTransaction(airdropTx);
+
+    const airdropForTaskWorkerTx = await connection.requestAirdrop(
+      taskWorkerKeypair.publicKey,
+      5 * web3.LAMPORTS_PER_SOL
+    );
+    await connection.confirmTransaction(airdropForTaskWorkerTx);
 
     console.log(new Date(), "fetching balance after airdrop");
     const balance = await connection.getBalance(taskSubmitterKeypair.publicKey);
@@ -90,6 +101,13 @@ describe("Task Tests: koii-smart-contract", () => {
       taskSubmitterKeypair.publicKey
     );
 
+    const taskWokerTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      taskWorkerKeypair,
+      mint,
+      taskWorkerKeypair.publicKey
+    );
+
     console.log(
       new Date(),
       "bootstraper token account is",
@@ -103,6 +121,16 @@ describe("Task Tests: koii-smart-contract", () => {
       taskSubmitterKeypair,
       mint,
       tokenAccount.address,
+      taskSubmitterKeypair.publicKey,
+      10_000_000
+    );
+
+    // mint some tokens to stake for task worker
+    await mintTo(
+      connection,
+      taskSubmitterKeypair,
+      mint,
+      taskWokerTokenAccount.address,
       taskSubmitterKeypair.publicKey,
       10_000_000
     );
@@ -269,5 +297,180 @@ describe("Task Tests: koii-smart-contract", () => {
       taskAccountOnSol.assignee.toBase58(),
       taskWorkerKeypair.publicKey.toBase58()
     );
+  });
+
+  it("Is Staking account initialized and stakes added!", async () => {
+    console.log(new Date(), "staking: Is staking initialized started");
+    const stakeAccount = web3.Keypair.generate();
+
+    // create stake token account IX
+    const createStakeAccountIx = web3.SystemProgram.createAccount({
+      programId: TOKEN_PROGRAM_ID,
+      space: AccountLayout.span,
+      lamports: await connection.getMinimumBalanceForRentExemption(
+        AccountLayout.span,
+        "confirmed"
+      ),
+      fromPubkey: taskWorkerKeypair.publicKey,
+      newAccountPubkey: stakeAccount.publicKey,
+    });
+
+    // init stake account IX
+    const initStakeAccountIx = createInitializeAccountInstruction(
+      stakeAccount.publicKey,
+      mintKeypair.publicKey,
+      taskWorkerKeypair.publicKey,
+      TOKEN_PROGRAM_ID
+    );
+
+    const stakeAccountInitTx = new web3.Transaction();
+    stakeAccountInitTx.add(createStakeAccountIx);
+    stakeAccountInitTx.add(initStakeAccountIx);
+
+    stakeAccountInitTx.feePayer = taskWorkerKeypair.publicKey;
+
+    // initializing new stake account with tx
+    console.log(new Date(), "staking: Initializing new stake token account");
+    const txSig = await connection.sendTransaction(stakeAccountInitTx, [
+      stakeAccount,
+      taskWorkerKeypair,
+    ]);
+    await connection.confirmTransaction(txSig);
+
+    console.log(new Date(), "finding PDA for:", program.programId.toBase58());
+    let [pda, bump] = await findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("staking_info_v0")),
+        taskWorkerKeypair.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+
+    let stakerTokenAccount = await getAssociatedTokenAddress(
+      mintKeypair.publicKey,
+      taskWorkerKeypair.publicKey
+    );
+
+    console.log(
+      new Date(),
+      "staking: staker token account is",
+      stakerTokenAccount.toBase58()
+    );
+
+    let [beforeStakeAccountOnSol, beforeBaAmount] =
+      await fetchDecodeTokenAccount(
+        stakeAccount.publicKey,
+        localAnchorProvider
+      );
+
+    console.log(
+      new Date(),
+      "## Assert: staking: stake account is owned by staker"
+    );
+    assert.equal(
+      beforeStakeAccountOnSol.owner.toBase58(),
+      taskWorkerKeypair.publicKey.toBase58()
+    );
+
+    console.log(new Date(), "staking: Invoking initialize");
+    const tx = await program.methods
+      .initializeStakingAccount(new anchor.BN(amountToStake))
+      .accounts({
+        stakeAccount: stakeAccount.publicKey,
+        stakingInfoAccount: pda,
+        staker: taskWorkerKeypair.publicKey,
+        stakerTokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: web3.SystemProgram.programId,
+      })
+      .signers([taskWorkerKeypair])
+      .rpc();
+    console.log(new Date(), "staking: Your transaction", tx);
+
+    let [stakeAccountOnSol, baAmount] = await fetchDecodeTokenAccount(
+      stakeAccount.publicKey,
+      localAnchorProvider
+    );
+
+    console.log(
+      new Date(),
+      "## Assert: staking: stake account is owned by Program"
+    );
+    assert.equal(stakeAccountOnSol.owner.toBase58(), pda.toBase58());
+
+    console.log(
+      new Date(),
+      "## Assert: staking: staked amount has been successfully transferred to Program Owned Stake Account"
+    );
+    assert.equal(amountToStake.toString(), baAmount);
+
+    let [_stakerTokenAccountOnSol, btAmount] = await fetchDecodeTokenAccount(
+      stakerTokenAccount,
+      localAnchorProvider
+    );
+
+    console.log(
+      new Date(),
+      "## Assert: staking: staker's token account is deducted"
+    );
+    assert.equal(amountAfterDeduction.toString(), btAmount);
+
+    let stakeInfoAccountOnSol = await program.account.stakeInfo.fetch(pda);
+
+    console.log(new Date(), "## Assert: staking: PDA is initialized correctly");
+    console.log(
+      new Date(),
+      "## Assert: staking: PDA has correct stake account address"
+    );
+    assert.equal(
+      stakeInfoAccountOnSol.stakeAccount.toBase58(),
+      stakeAccount.publicKey.toBase58()
+    );
+
+    console.log(new Date(), "## Assert: staking PDA has right staked amount");
+    assert.ok(
+      stakeInfoAccountOnSol.stakedAmount.eq(new anchor.BN(amountToStake))
+    );
+
+    console.log(new Date(), "All assertions successful");
+  });
+
+  it("Can vote successfully", async () => {
+    let [taskPda, taskBump] = await findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("task_v0")),
+        taskSubmitterKeypair.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+
+    let [stakingInfoPda, stakingInfoBump] = await findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("staking_info_v0")),
+        taskWorkerKeypair.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+
+    let beforeTaskAccountOnSol = await program.account.task.fetch(taskPda);
+
+    console.log(new Date(), "## Assert: PDA  task vote has not been casted");
+    assert.equal(0, beforeTaskAccountOnSol.votes);
+
+    const vote_tx = await program.methods
+      .vote()
+      .accounts({
+        stakingInfoAccount: stakingInfoPda,
+        taskAccount: taskPda,
+        voter: taskWorkerKeypair.publicKey,
+      })
+      .signers([taskWorkerKeypair])
+      .rpc();
+
+    console.log(new Date(), "vote tx:", vote_tx);
+    let taskAccountOnSol = await program.account.task.fetch(taskPda);
+
+    console.log(new Date(), "## Assert: PDA  task vote has been casted");
+    assert.equal(1, taskAccountOnSol.votes);
   });
 });

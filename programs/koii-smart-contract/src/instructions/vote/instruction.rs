@@ -1,48 +1,35 @@
+use crate::error::ErrorCode;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self};
 
-use super::account::StakingInput;
+use super::account::VoteInput;
 
-pub fn initialize_staking(ctx: Context<StakingInput>, staked_amount: u64) {
-    // let clock: Clock = Clock::get().unwrap();
-    ctx.accounts.staking_info_account.bump =
-        ctx.bumps.get("staking_info_account").unwrap().to_owned();
-    ctx.accounts.staking_info_account.stake_account = ctx.accounts.stake_account.key();
-    ctx.accounts.staking_info_account.staked_amount = staked_amount;
-    // ctx.accounts.staking_info_account.staked_at = clock.unix_timestamp;
+pub fn vote(ctx: Context<VoteInput>) -> Result<()> {
+    let voter = &ctx.accounts.voter;
 
-    // transfer staked token from user token account to program owned account
-    let transfer = token::Transfer {
-        from: ctx.accounts.staker_token_account.to_account_info(),
-        to: ctx.accounts.stake_account.to_account_info(),
-        authority: ctx.accounts.staker.to_account_info(),
-    };
+    let (expected_pda, _bump) =
+        Pubkey::find_program_address(&[b"staking_info_v0", voter.key().as_ref()], ctx.program_id);
 
-    let token_transfer_ctx =
-        CpiContext::new(ctx.accounts.token_program.to_account_info(), transfer);
-
-    match token::transfer(token_transfer_ctx, staked_amount) {
-        Ok(_) => (),
-        Err(_) => msg!("Token transfer failed"),
-    }
-
-    let token_account_set_auth_ctx = token::SetAuthority {
-        current_authority: ctx.accounts.staker.to_account_info(),
-        account_or_mint: ctx.accounts.stake_account.to_account_info(),
-    };
-
-    let set_auth_result = token::set_authority(
-        CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            token_account_set_auth_ctx,
-        ),
-        token::spl_token::instruction::AuthorityType::AccountOwner,
-        Some(ctx.accounts.staking_info_account.key()),
+    msg!(
+        "staker: {}, voter: {}",
+        ctx.accounts.staking_info_account.key(),
+        voter.key()
     );
 
-    match set_auth_result {
-        Ok(_) => (),
-        Err(_) => msg!("Token set authority failed"),
-    }
-    msg!("Staking Info Account initialized successfully");
+    // check if the staking account belongs to voter
+    require!(
+        ctx.accounts.staking_info_account.key().eq(&expected_pda),
+        ErrorCode::InvalidStakeAccountForVote
+    );
+
+    // check if voter has staked the amount
+    require!(
+        ctx.accounts.staking_info_account.staked_amount > 0,
+        ErrorCode::InvalidStakedAmountForVote
+    );
+
+    // increment the vote
+    ctx.accounts.task_account.votes += 1;
+    msg!("Voted for task");
+
+    Ok(())
 }
