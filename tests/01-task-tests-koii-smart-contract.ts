@@ -546,8 +546,10 @@ describe("Task Tests: koii-smart-contract", () => {
       "## Assert: claim_bouty: bounty has been credited to claimer"
     );
     assert.equal(
-      afterClaimerBalance.toString(),
-      (beforeClaimerBalance + beforeBountyAccBalance).toString()
+      new anchor.BN(beforeClaimerBalance)
+        .add(new anchor.BN(beforeBountyAccBalance))
+        .toString(),
+      afterClaimerBalance.toString()
     );
   });
 });
