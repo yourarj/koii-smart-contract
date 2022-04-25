@@ -15,6 +15,7 @@ pub fn initialize_task(
     ctx.accounts.task_account.audit_program_location = task_program_location;
     ctx.accounts.task_account.task_program_location = audit_program_location;
     ctx.accounts.task_account.votes = 0;
+    ctx.accounts.task_account.creator = ctx.accounts.bootstraper.key();
 
     let transfer = token::Transfer {
         from: ctx.accounts.bootstraper_token_account.to_account_info(),
