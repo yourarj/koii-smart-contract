@@ -38,8 +38,18 @@ pub fn claim_bounty(ctx: Context<BountyClaimInput>) -> Result<()> {
         authority: ctx.accounts.task_account.to_account_info(),
     };
 
-    let token_transfer_ctx =
-        CpiContext::new(ctx.accounts.token_program.to_account_info(), transfer);
+    let seeds = &[
+        b"task_v0",
+        ctx.accounts.task_account.creator.as_ref(),
+        &[ctx.accounts.task_account.bump],
+    ];
+    let signer_seeds = &[&seeds[..]];
+
+    let token_transfer_ctx = CpiContext::new_with_signer(
+        ctx.accounts.token_program.to_account_info(),
+        transfer,
+        signer_seeds,
+    );
 
     match token::transfer(token_transfer_ctx, bounty_amout) {
         Ok(_) => (),
