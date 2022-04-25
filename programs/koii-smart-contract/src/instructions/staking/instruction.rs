@@ -4,12 +4,12 @@ use anchor_spl::token::{self};
 use super::account::StakingInput;
 
 pub fn initialize_staking(ctx: Context<StakingInput>, staked_amount: u64) {
-    // let clock: Clock = Clock::get().unwrap();
+    let clock: Clock = Clock::get().unwrap();
     ctx.accounts.staking_info_account.bump =
         ctx.bumps.get("staking_info_account").unwrap().to_owned();
     ctx.accounts.staking_info_account.stake_account = ctx.accounts.stake_account.key();
     ctx.accounts.staking_info_account.staked_amount = staked_amount;
-    // ctx.accounts.staking_info_account.staked_at = clock.unix_timestamp;
+    ctx.accounts.staking_info_account.staked_at = clock.unix_timestamp;
 
     // transfer staked token from user token account to program owned account
     let transfer = token::Transfer {
